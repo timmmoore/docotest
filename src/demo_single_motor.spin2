@@ -1,0 +1,170 @@
+'' =================================================================================================
+''
+''   File....... demo_single_motor.spin2
+''   Purpose.... Demonstrate control of a single BLDC Motor
+''   Authors.... Stephen M Moraco
+''               -- Copyright (c) 2022 Iron Sheep Productions, LLC
+''               -- see below for terms of use
+''   E-mail..... stephen@ironsheep.biz
+''   Started.... Feb 2022
+''   Updated.... 9 Feb 2022
+''
+'' =================================================================================================
+
+CON { timing }
+
+  CLK_FREQ = 270_000_000                                        ' system freq as a constant
+  _clkfreq = CLK_FREQ                                           ' set system clock
+
+CON { fixed io pins }
+
+  RX1      = 63  { I }                                          ' programming / debug
+  TX1      = 62  { O }
+
+  SF_CS    = 61  { O }                                          ' serial flash
+  SF_SCK   = 60  { O }
+  SF_SDO   = 59  { O }
+  SF_SDI   = 58  { I }
+
+CON { application io pins }
+
+    ' describe where things are attached to our JonnyMac eval board
+
+    'HDMI_BASE_PIN       = tvDebug.PINS_P8_P15
+
+    'MTR_HOLD_AT_SPEED_IN_SEC = 6        ' use for LA capture of both sides (fwd, rev)
+    MTR_HOLD_AT_SPEED_IN_SEC = 15
+
+OBJ { our Motor(s) }
+
+    user        :   "isp_bldc_motor_userconfig"     ' driver configuration
+    'tvDebug     :   "isp_hdmi_debug"         ' HDMI debug object
+    wheel       :   "isp_bldc_motor"        ' the single BLDC motor
+
+DAT { run-time condition vars }
+
+    bUseHDMI    LONG   TRUE       ' set to TRUE to enable HDMI use/output
+
+
+PUB main() | nGroups, pGroupTitles, pGroupNames, pGroupVarCts, pGroupVars, motorCog, senseCog, basePin, voltage, motor, detectMode
+'' DEMO Driving a single wheeled platform
+
+    ' start our HDMI debug output
+'    if bUseHDMI
+'        basePin := tvDebug.validBasePinForChoice(HDMI_BASE_PIN)
+'        if basePin <> tvDebug.INVALID_PIN_BASE
+'            tvDebug.start(basePin)
+
+    ' validate user settings/choicess
+    '  do NOT start motor unless all are legit!
+    basePin := wheel.validBasePinForChoice(user.ONLY_MOTOR_BASE)
+    detectMode := wheel.validDetectModeForChoice(user.ONLY_BOARD_TYPE)
+    voltage := wheel.validVoltageForChoice(user.DRIVE_VOLTAGE)
+    motor := wheel.validMotorForChoice(user.MOTOR_TYPE)
+
+    if basePin <> wheel.INVALID_PIN_BASE and voltage <> wheel.INVALID_VOLTAGE and motor <> wheel.INVALID_MOTOR and detectMode <> wheel.INVALID_DET_MODE
+        ' start our single motor driver
+        motorCog := wheel.start(basePin, voltage, detectMode)
+        'tvDebug.reportMotorCog(motorCog)
+
+        ' for single motor let's start the single motor sense task
+        senseCog := wheel.startSenseCog()
+{
+        if bUseHDMI
+            nGroups, pGroupTitles, pGroupNames, pGroupVarCts, pGroupVars := wheel.getDebugData()
+            debug("* Received: ", udec(nGroups), uhex_long(pGroupTitles), uhex_long(pGroupNames), uhex_long(pGroupVarCts), uhex_long(pGroupVars))
+
+            tvDebug.registerDisplay(nGroups, pGroupTitles, pGroupNames, pGroupVarCts, pGroupVars)
+}
+        ' - testing NEW Control Method -
+        ' ensure motor is ready be commanded
+        waitUntilMotorReady()
+        wheel.setMaxSpeed(100)  ' override 75% with 100% for these tests
+        'wheel.setMaxSpeed(90)  ' override 75% with 90% for these tests
+        'wheel.setMaxSpeed(50)  ' override 75% with 50% for these tests (offset checks)
+        'wheel.setMaxSpeed(15)  ' override 75% with 15% for these tests
+        ' now drive!
+
+        wheel.stopAfterTime(MTR_HOLD_AT_SPEED_IN_SEC, wheel.DTU_SEC)      ' set to hold at speed for 15 Sec
+        wheel.driveAtPower(100)                      ' now go FWD at 100% pwr
+
+        waitUntilMotorDone()
+
+        wheel.driveAtPower(-100)                     ' REV at 100% pwr
+        wheel.stopAfterTime(MTR_HOLD_AT_SPEED_IN_SEC, wheel.DTU_SEC)      ' hold at speed for 15 Sec
+
+        waitUntilMotorDone()
+
+        debug("* holding for 20 secs...")
+        waitms(20000)   ' 20 seconds, then stop
+
+        ' TBA  let's add a drive loop
+
+        ' turn off our motor drivers
+        wheel.stop()
+
+VAR
+    ' work values
+    LONG    minX
+    LONG    minY
+    LONG    maxX
+    LONG    maxY
+
+
+PRI waitUntilMotorReady()
+    if wheel.isReady() == false
+        debug("* wait motor ready...")
+        repeat
+            if wheel.isReady()
+                quit
+            else
+                waitms(2)
+    debug("* Motor ready, let's drive!")
+
+
+PRI waitUntilMotorDone()
+    if wheel.isStarting() == false
+         debug("* wait until motor starts...")
+         repeat
+            if wheel.isStarting()
+                quit
+            else
+                waitms(2)
+
+    if wheel.isStopped() == false
+        debug("* wait until motor finishes...")
+        repeat
+            if wheel.isStopped()
+                quit
+            else
+                waitms(2)
+    debug("* Motor stopped! wait 4ms")
+    'waitms(4)
+
+CON { license }
+{{
+
+ -------------------------------------------------------------------------------------------------
+  MIT License
+
+  Copyright (c) 2022 Iron Sheep Productions, LLC
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+ =================================================================================================
+}}
