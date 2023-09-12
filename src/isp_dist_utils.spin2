@@ -24,36 +24,28 @@ PUB null()
 
 '' This is not a top-level object
 
-PUB circInInchforDiaInInch(nDiaInch) : nCircInInch | fValue
+PUB circInInchforDiaInInch(nDiaInch) : nCircInInch
 '' Return circumference in inch for given diameter in inch
-    ' RULE: circ = 2 * pi * r
-    fValue := float(nDiaInch) *. kPI
-    nCircInInch := trunc(fValue)
+    ' RULE: circ = d * pi
+    nCircInInch := round(float(nDiaInch) *. kPI)
 
 PUB circInMMforDiaInInch(nDiaInch) : nCircInMM
 '' Return circumference in mm for given diameter in inch
-    ' RULE: circ = 2 * pi * r
-    nCircInMM := circInMMforDiaInInchFloat(float(nDiaInch))
+    nCircInMM := round(floatCircInMMforDiaInInchFloat(float(nDiaInch)))
 
-PUB circInMMforDiaInInchFloat(fDiaInch) : nCircInMM | fValue
+PUB circInMMforDiaInInchFloat(fDiaInch) : nCircInMM
 '' Return circumference in mm for given diameter in inch
-    ' RULE: circ = 2 * pi * r
-    nCircInMM := 0
-    if fDiaInch <> 0.0
-        fValue := fDiaInch *. kPI
-        nCircInMM := round(fValue *. kMM_IN_INCH)
+    nCircInMM := round(floatCircInMMforDiaInInchFloat(fDiaInch))
 
-PUB floatCircInMMforDiaInInchFloat(fDiaInch) : fCircInMM | fValue
+PUB floatCircInMMforDiaInInchFloat(fDiaInch) : fCircInMM
 '' Return circumference in mm for given diameter in inch
-    ' RULE: circ = 2 * pi * r
-    fValue := fDiaInch *. kPI
-    fCircInMM := fValue *. kMM_IN_INCH
+    ' RULE: circ = d * pi
+    fCircInMM := fDiaInch *. kPI *. kMM_IN_INCH
 
-PUB mmps2fps(nDistInMMPS) : nDistInFps | fValue
+PUB mmps2fps(nDistInMMPS) : nDistInFps
 '' Convert distance in mm/s to fps
     ' RULE: 1 mm/sec = 0.00328084 ft/sec
-    fValue := float(nDistInMMPS) *. kFPS_IN_MMPS
-    nDistInFps := trunc(fValue)
+    nDistInFps := round(float(nDistInMMPS) *. kFPS_IN_MMPS)
 
 PUB in2mm(nDistInInch) : nDistInMM | fValue
 '' Convert distance in inch to mm
@@ -61,35 +53,30 @@ PUB in2mm(nDistInInch) : nDistInMM | fValue
     fValue := float(nDistInInch) *. kMM_IN_INCH
     nDistInMM := trunc(fValue)
 
-PUB fIn2mm(nDistInInch) : fDistInMM | fValue
+PUB fIn2mm(nDistInInch) : fDistInMM
 '' Convert distance in inch to mm
     ' RULE: One inch is equal to 25.4 mm
-    fValue := float(nDistInInch) *. kMM_IN_INCH
-    fDistInMM := fValue
+    fDistInMM := float(nDistInInch) *. kMM_IN_INCH
 
-PUB mm2in(nDistInMM) : nDistInInch | fValue
+PUB mm2in(nDistInMM) : nDistInInch
 '' Convert distance in mm to inches
     ' RULE: One millimeter is equal to 0.03937 inches
-    fValue := float(nDistInMM) *. kINCH_IN_MM
-    nDistInInch := trunc(fValue)
+    nDistInInch := round(fMm2inFloat(float(nDistInMM)))
 
-PUB fMm2inFloat(fDistInMM) : fDistInInch | fValue
+PUB fMm2inFloat(fDistInMM) : fDistInInch
 '' Convert distance in mm to inches
     ' RULE: One millimeter is equal to 0.03937 inches
     fDistInInch := fDistInMM *. kINCH_IN_MM
 
-
-PUB mmps2kmh(nDistInMMPS) : nDistInkmph | fValue
+PUB mmps2kmh(nDistInMMPS) : nDistInkmph
 '' Convert distance in mm/s to km/hr
     ' RULE: 1 mm/sec = 0.0036 km/hr
-    fValue := float(nDistInMMPS) *. kKMH_IN_MMPS
-    nDistInkmph := trunc(fValue)
+    nDistInkmph := round(float(nDistInMMPS) *. kKMH_IN_MMPS)
 
-PUB fps2mph(nDistInFPS) : nDistInMPH | fValue
+PUB fps2mph(nDistInFPS) : nDistInMPH
 '' Convert distance in ft/s to mi/hr
     ' RULE: 1 ft/sec = 0.681818 mi/hr
-    fValue := float(nDistInFPS) *. kMPH_IN_FPS
-    nDistInMPH := trunc(fValue)
+    nDistInMPH := round(float(nDistInFPS) *. kMPH_IN_FPS)
 
 CON { license }
 {{

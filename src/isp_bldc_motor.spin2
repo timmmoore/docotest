@@ -33,6 +33,8 @@
 ''                              allow sync of motor cog, start and change of speed
 ''                              change ramping code to be continuous increment from a min to max
 ''                              setAcceleration can change the ramp increment
+''   Updated.... 10 Sep 2023 (timmoore)
+''                              allow any motor to have WHEEL_DIA_IN_INCH set in userconfig
 ''
 '' =================================================================================================
 
@@ -270,19 +272,16 @@ PRI init(eMotorBasePin, eMotorVoltage, eDetectionMode) | fwdDegrees, revDegrees
     tvMaxFps_x10 := 0
     tvMaxMPH_x10 := 0
     tvMaxkPH_x10 := 0
-'}
 
     eUserSelectedVolts := VALUE_NOT_SET                 ' ensure we don't drive motor unles we know the users' voltage!
 
     debug("* init values ", udec_long(dead_gap), udec_long(pwm_limit), udec_long(adc_fram), udec_long(duty_min), udec_long(duty_max))
     debug("*      values ", udec_long(duty_up), udec_long(duty_dn), udec_long(cfg_ctcks))
 
+    if user.WHEEL_DIA_IN_INCH <> 0
+        circInMM_x10 := distConv.circInMMforDiaInInchFloat(user.WHEEL_DIA_IN_INCH) * 10
+        tickInMM_x10 := circInMM_x10 / hallTicsPerRotation
 
-    circInMM_x10 := distConv.circInMMforDiaInInchFloat(user.WHEEL_DIA_IN_INCH)
-    tickInMM_x10 := 0
-    if circInMM_x10 <> 0 and user.MOTOR_TYPE == MOTR_6_5_INCH
-        tickInMM_x10 := circInMM_x10 / 90
-'}
     confgurePowerLimits(user.DRIVE_VOLTAGE)
 
     rSenseForBoard := VALUE_NOT_SET
@@ -443,8 +442,8 @@ PUB stopAfterRotation(nRotationCount, eRotationUnits)
             debug("! ERROR: invalid rotationUnits Value:", udec_long(eRotationUnits))
             abort
 
-PUB stopAfterDistance(nDistance, eDistanceUnits) | fValue
-'' Stops the motor after either it reaches {distance} specified in {distanceUnits} [DDU_MM, DDU_CM, DDU_IN, DDU_FT, DDU_M].
+PUB stopAfterDistance(nDistance, eDistanceUnits)
+'' Stops the motor after it reaches {distance} specified in {distanceUnits} [DDU_MM, DDU_CM, DDU_IN, DDU_FT, DDU_M].
 '' USE WITH:  driveAtPower()
 '' Will ABORT if {distance} < 1
     if nDistance < 1
@@ -463,11 +462,9 @@ PUB stopAfterDistance(nDistance, eDistanceUnits) | fValue
         DDU_CM:
             motorStopHallTicks := (nDistance * 10 * 10) / tickInMM_x10
         DDU_IN:
-            fValue := distConv.fIn2mm(nDistance)
-            motorStopHallTicks := trunc(fValue *. 10.0) / tickInMM_x10
+            motorStopHallTicks := round(distConv.fIn2mm(nDistance) *. 10.0) / tickInMM_x10
         DDU_FT:
-            fValue := distConv.fIn2mm(nDistance * 12)
-            motorStopHallTicks := trunc(fValue *. 10.0) / tickInMM_x10
+            motorStopHallTicks := round(distConv.fIn2mm(nDistance * 12) *. 10.0) / tickInMM_x10
         DDU_M:
             motorStopHallTicks := (nDistance * 100 * 10) / tickInMM_x10
         other:
@@ -493,9 +490,13 @@ PUB stopAfterTime(nTime, eTimeUnits) | timeNow
     if eTimeUnits == DTU_SEC
         timeNow := getms()
         motorStopMSecs := timeNow + (nTime * 1_000)
+        if motorStopMSecs == 0
+            motorStopMSecs := 1
     else
         timeNow := getms()
         motorStopMSecs := timeNow + nTime
+        if motorStopMSecs == 0
+            motorStopMSecs := 1
 
     if motorStopMSecs > 0
         debug("* stop motor at ", udec_long(motorStopMSecs), ", now: ", udec_long(timeNow))
@@ -527,27 +528,27 @@ PUB getDistance(eDistanceUnits) : nDistanceInUnits | fMMpTick, fValue
     nDistanceInUnits := 0
     ' if we know the wheel diameter, then calculate value and return it
     if user.WHEEL_DIA_IN_INCH <> 0.0
-        fMMpTick := float(circInMM_x10) /. 90.0 /. 10.0
+        fMMpTick := float(circInMM_x10) /. float(hallTicsPerRotation) /. 10.0
         case eDistanceUnits
             DDU_MM:
-                nDistanceInUnits := trunc(float(posTrkHallTicks) *. fMMpTick)
+                nDistanceInUnits := round(float(posTrkHallTicks) *. fMMpTick)
             DDU_CM:
-                nDistanceInUnits := trunc(float(posTrkHallTicks) *. fMMpTick /. 10.0)
+                nDistanceInUnits := round(float(posTrkHallTicks) *. fMMpTick /. 10.0)
             DDU_IN:
                 fValue := distConv.fMm2inFloat(float(posTrkHallTicks) *. fMMpTick)
-                nDistanceInUnits := trunc(fValue +. 0.5)    ' rounded
+                nDistanceInUnits := round(fValue)
             DDU_FT:
                 fValue := distConv.fMm2inFloat(float(posTrkHallTicks) *. fMMpTick)
-                nDistanceInUnits := trunc(fValue /. 12.0 +. 0.5)    ' in FT, rounded
+                nDistanceInUnits := round(fValue /. 12.0)                       ' in FT
             DDU_M:
                 fValue := float(posTrkHallTicks) *. fMMpTick
-                nDistanceInUnits := trunc(fValue /. 1000.0)    ' in M
+                nDistanceInUnits := round(fValue /. 1000.0)                     ' in M
             DDU_MI:
                 fValue := distConv.fMm2inFloat(float(posTrkHallTicks) *. fMMpTick)
-                nDistanceInUnits := trunc(fValue /. 5280.0 /. 12.0)    ' in MI
+                nDistanceInUnits := round(fValue /. 5280.0 /. 12.0)             ' in MI
             DDU_KM:
                 fValue := float(posTrkHallTicks) *. fMMpTick
-                nDistanceInUnits := trunc(fValue /. 1000.0 /. 1000.0)    ' in kM
+                nDistanceInUnits := round(fValue /. 1000.0 /. 1000.0)           ' in kM
             other:
                 debug("! ERROR: invalid distanceUnits Value:", udec_long(eDistanceUnits))
                 abort
@@ -1274,11 +1275,11 @@ PRI taskPostionSense() | senseStartTicks, fValue, fFps, timeNow, eStopCtr,  loop
 }
 
         ' accum our windowed values
-        hallWindowSum -= LONG[@hallCountsWindow][hallWinIndex]          ' Remove the oldest entry from the sum
-        long [@hallCountsWindow][hallWinIndex] := hallCntsIn8thSec      ' place the newest reading into the window
-        hallWindowSum += hallCntsIn8thSec                               ' Add the newest reading to the sum
-        hallWinIndex := (hallWinIndex + 1) +// HALL_WINDOW_SIZE         ' Increment the index, and wrap to 0 if it exceeds the window size
-        if hallWinEntryCt < HALL_WINDOW_SIZE                            ' incr number of samples in sum until is window size
+        hallWindowSum -= LONG[@hallCountsWindow][hallWinIndex]                  ' Remove the oldest entry from the sum
+        long [@hallCountsWindow][hallWinIndex] := hallCntsIn8thSec              ' place the newest reading into the window
+        hallWindowSum += hallCntsIn8thSec                                       ' Add the newest reading to the sum
+        hallWinIndex := (hallWinIndex + 1) +// HALL_WINDOW_SIZE                 ' Increment the index, and wrap to 0 if it exceeds the window size
+        if hallWinEntryCt < HALL_WINDOW_SIZE                                    ' incr number of samples in sum until is window size
             hallWinEntryCt++
 
         updateSenseData(hallCntsIn8thSec, hallWindowSum)                        ' used internally and by 2-wheel-steering
@@ -1335,13 +1336,13 @@ PUB updateSenseData(nHallCntsIn8thSec, nHallWindowSum)
     tv_mA := sense_i_mV/rSenseForBoard                                         ' in multiples of 0.1mA
     tv_mW := round((float(tv_mA) *. fMotorVolts)/. F_SCALE_WATTS)               ' in mW
 
-    if user.MOTOR_TYPE == MOTR_6_5_INCH
-        ' pos is in hall-steps of 4Degr each.
+    if user.WHEEL_DIA_IN_INCH <> 0
+        ' pos is in hall-steps of 4Degr each (4deg for 6.5motor, 15deg for doco4k).
         ' circumference of wheel is in mm x10
         '   degrees of rotation is cntsInSec * 4
         '   number of rotations is degrees / 360
         '   dist in mm is (circInMM_x10 * rotations) / 10
-        mmPerSec_x10 := (((cntsInSec * 4) * circInMM_x10) / 360)
+        mmPerSec_x10 := (((cntsInSec * degrPerTic) * circInMM_x10) / 360)
         ftPerSec_x10 := distConv.mmps2fps(mmPerSec_x10 * 10)
         kmh_x10 := distConv.mmps2kmh(mmPerSec_x10 * 10)
         mph_x10 := distConv.fps2mph(ftPerSec_x10)
